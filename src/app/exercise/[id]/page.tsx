@@ -13,6 +13,7 @@ interface ExerciseDetailPageProps {
   params: {
     id: string;
   };
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) {

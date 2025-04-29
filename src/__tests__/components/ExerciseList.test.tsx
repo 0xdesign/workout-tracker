@@ -70,7 +70,7 @@ describe('ExerciseList', () => {
     
     // Use getAllByText for elements that appear multiple times and select the first one
     const benchPressDetails = screen.getAllByText((content, element) => {
-      return element.tagName.toLowerCase() === 'p' && 
+      return element?.tagName.toLowerCase() === 'p' && 
              content.includes('3 sets') && 
              content.includes('10 reps') && 
              content.includes('135 lb');
@@ -78,7 +78,7 @@ describe('ExerciseList', () => {
     expect(benchPressDetails.length).toBeGreaterThan(0);
     
     const shoulderPressDetails = screen.getByText((content, element) => {
-      return element.tagName.toLowerCase() === 'p' && 
+      return element?.tagName.toLowerCase() === 'p' && 
              content.includes('3 sets') && 
              content.includes('8-12 reps') && 
              content.includes('80 lb');
