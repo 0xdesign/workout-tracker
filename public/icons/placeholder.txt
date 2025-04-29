@@ -1,0 +1,6 @@
+Icons for PWA:
+- icon-192x192.png (192x192 px)
+- icon-384x384.png (384x384 px)
+- icon-512x512.png (512x512 px)
+
+These should be created with a proper icon generator tool later. 
