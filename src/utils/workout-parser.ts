@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 export function parseWorkoutPlan(markdown: string): WorkoutPlan {
   const lines = markdown.split('\n').filter(line => line.trim() !== '');
   
-  let currentPlan: WorkoutPlan = {
+  const currentPlan: WorkoutPlan = {
     id: uuidv4(),
     name: 'Default Workout Plan',
     days: []

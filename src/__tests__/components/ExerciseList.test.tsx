@@ -5,9 +5,11 @@ import { WorkoutDay } from '@/types/workout';
 
 // Mock Next.js Link component
 jest.mock('next/link', () => {
-  return ({ href, children }: { href: string; children: React.ReactNode }) => {
+  const MockLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
     return <a href={href}>{children}</a>;
   };
+  MockLink.displayName = 'MockLink';
+  return MockLink;
 });
 
 // Mock the formatTempo function to avoid tempo parsing issues

@@ -7,16 +7,20 @@ import '@testing-library/jest-dom';  // Add this import for toBeInTheDocument ma
 
 // Mock Next.js Link component and useIntersection
 jest.mock('next/link', () => {
-  return ({children}: {children: React.ReactNode}) => {
+  const MockLink = ({children}: {children: React.ReactNode}) => {
     return <a>{children}</a>;
   };
+  MockLink.displayName = 'MockLink';
+  return MockLink;
 });
 
 // Mock next/image
 jest.mock('next/image', () => {
-  return ({src, alt}: {src: string, alt: string}) => {
+  const MockImage = ({src, alt}: {src: string, alt: string}) => {
     return <img src={src} alt={alt} />;
   };
+  MockImage.displayName = 'MockImage';
+  return MockImage;
 });
 
 // Mock Next.js router

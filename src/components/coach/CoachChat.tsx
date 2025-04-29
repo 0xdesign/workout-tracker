@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Message, Conversation, ChatContext, QuickPrompt } from '@/types/coach';
 import { WorkoutCoachResponse, WorkoutPerformance } from '@/types/workout';
 import { quickPrompts } from '@/lib/coach-service';
@@ -30,19 +30,24 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
   
   const { refreshData } = useWorkoutData();
   
-  // Load conversation if conversationId is provided
-  useEffect(() => {
-    if (conversationId) {
-      loadConversation(conversationId);
-    } else {
-      createNewConversation();
-    }
-  }, [conversationId]);
+  // Scroll to the bottom of the messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
   
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [conversation?.messages]);
+  // Create a new conversation
+  const createNewConversation = async () => {
+    try {
+      const newConversation = await coachService.createConversation(
+        undefined,
+        initialContext
+      );
+      setConversation(newConversation);
+    } catch (err) {
+      console.error('Error creating conversation:', err);
+      setError('Failed to create conversation');
+    }
+  };
   
   // Load an existing conversation
   const loadConversation = async (id: string) => {
@@ -61,24 +66,22 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
     }
   };
   
-  // Create a new conversation
-  const createNewConversation = async () => {
-    try {
-      const newConversation = await coachService.createConversation(
-        undefined,
-        initialContext
-      );
-      setConversation(newConversation);
-    } catch (err) {
-      console.error('Error creating conversation:', err);
-      setError('Failed to create conversation');
+  // Load conversation if conversationId is provided
+  useEffect(() => {
+    if (conversationId) {
+      loadConversation(conversationId);
+    } else {
+      createNewConversation();
     }
-  };
+    // ESLint is disabled here because these functions are defined in the component
+    // and don't need to be dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
   
-  // Scroll to the bottom of the messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [conversation?.messages]);
   
   // Send a message to the AI coach
   const sendMessage = async (content: string) => {

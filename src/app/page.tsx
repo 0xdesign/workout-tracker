@@ -6,10 +6,10 @@ import { useWorkoutData } from '@/providers/WorkoutDataProvider';
 
 export default function Home() {
   const { workoutDaysByDate, workoutCompletionStatus, isLoading, error } = useWorkoutData();
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   
   const handleDateSelect = (date: string) => {
-    setSelectedDate(date);
+    // Handle date selection here if needed in the future
+    console.log(`Date selected: ${date}`);
   };
   
   if (isLoading) {
