@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { WorkoutPlan, WorkoutDay, WorkoutPerformance } from '@/types/workout';
 import * as workoutService from '@/lib/workout-service';
+import { parseWorkoutPlan } from '@/utils/workout-parser';
 
 interface WorkoutDataContextType {
   isLoading: boolean;
@@ -22,6 +23,29 @@ interface WorkoutDataProviderProps {
   children: ReactNode;
 }
 
+// Fallback workout plan markdown content if API fails
+const FALLBACK_WORKOUT_PLAN = `# 4-DAY WORKOUT PLAN
+
+## DAY 1: UPPER BODY A
+
+### Mobility/Warm-up
+- **M1**: Bird Dogs with 5sec Hold @ top (5 each side, 1 set, Controlled tempo)
+  - *Reach opposite arm and leg - think long not high - keep spine neutral*
+- **M2**: Stick Dislocates (10 reps, 1 set, Controlled tempo)
+  - *Go as wide as needed to keep arms straight and movement smooth*
+- **M3**: Lock Banded or Cable Lat Pull (10 each side, 1 set, Controlled tempo)
+  - *Pull elbow toward hip to activate back, particularly lats*
+
+### Main Workout
+- **A1**: 30° Incline DB Press - Rotating grip (10-12 reps, 3 sets, Tempo: 3020, Rest: 90s)
+  - *Keep it smooth - squeeze it up - 3s down and 2s up - no bouncing off chest*
+  - *Recommended weight: 45 lbs*
+
+- **A2**: Chin Ups - Mid Pronated Grip - Machine assisted (10-12 reps, 3 sets, Tempo: 3020, Rest: 90s)
+  - *2s up and 3s down*
+  - *Keep good posture - Don't let shoulders roll forward*
+  - *Recommended assistance: 140 lbs on machine*`;
+
 export function WorkoutDataProvider({ children }: WorkoutDataProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,14 +64,22 @@ export function WorkoutDataProvider({ children }: WorkoutDataProviderProps) {
       
       // If no plan exists in the database, fetch from API
       if (!plan) {
-        const response = await fetch('/api/workout-plan');
-        const data = await response.json();
-        
-        if (!data.success || !data.workoutPlan) {
-          throw new Error(data.error || 'Failed to load workout plan');
+        try {
+          const response = await fetch('/api/workout-plan');
+          const data = await response.json();
+          
+          if (!data.success || !data.workoutPlan) {
+            throw new Error(data.error || 'Failed to load workout plan');
+          }
+          
+          plan = data.workoutPlan;
+        } catch (apiError) {
+          console.error('API error, using fallback plan:', apiError);
+          
+          // Use fallback workout plan if API fails
+          plan = parseWorkoutPlan(FALLBACK_WORKOUT_PLAN);
+          console.log('Using fallback workout plan');
         }
-        
-        plan = data.workoutPlan;
         
         // Save the plan to IndexedDB
         try {
