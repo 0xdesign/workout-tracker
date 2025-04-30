@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
     // Similarly, this allows builds to succeed even with TypeScript errors
     ignoreBuildErrors: true,
   },
+  env: {
+    // Define app URL based on environment
+    NEXT_PUBLIC_APP_URL: process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  },
 };
 
 const config = withPWA({
