@@ -191,6 +191,30 @@ export async function getExercisePerformanceHistory(
 }
 
 /**
+ * Get recent workout performances
+ * @param limit Maximum number of performances to return
+ * @returns Array of workout performances, ordered by date (newest first)
+ */
+export async function getRecentWorkoutPerformances(
+  limit = 5
+): Promise<WorkoutPerformance[]> {
+  // Get all workout performances
+  const performances = await db.getAll('workout-performances');
+  
+  // Sort by date (newest first) and limit
+  return performances
+    .sort((a, b) => {
+      // Sort by timestamp if available
+      if (a.timestamp && b.timestamp) {
+        return b.timestamp - a.timestamp;
+      }
+      // Fall back to date comparison
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    })
+    .slice(0, limit);
+}
+
+/**
  * Create a default template for recording a workout performance
  * @param workoutDayId The workout day ID
  * @returns A pre-populated workout performance object

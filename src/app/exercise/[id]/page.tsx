@@ -8,6 +8,8 @@ import { formatTempo } from '@/utils/workout-parser';
 import Link from 'next/link';
 import * as workoutService from '@/lib/workout-service';
 import AISuggestions from '@/components/AISuggestions';
+import { SetTracker } from '@/components/workout/SetTracker';
+import RestTimer from '@/components/workout/RestTimer';
 
 interface ExerciseDetailPageProps {
   params: {
@@ -30,6 +32,7 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
   const [previousPerformance, setPreviousPerformance] = useState<ExercisePerformance | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [performanceHistory, setPerformanceHistory] = useState<ExercisePerformance[]>([]);
+  const [showRestTimer, setShowRestTimer] = useState(false);
   
   // Load exercise data
   useEffect(() => {
@@ -114,6 +117,32 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
       completedReps: newCompletedReps,
       completedSets: newCompletedReps.filter(reps => reps > 0).length
     });
+  };
+  
+  const handleUpdatePerformance = (updatedPerformance: ExercisePerformance) => {
+    setPerformance(updatedPerformance);
+  };
+  
+  const handleCompleteSet = (setIndex: number) => {
+    if (!performance || !exercise) return;
+    
+    // Update completed sets
+    let newCompletedSets = setIndex + 1;
+    if (newCompletedSets <= performance.completedSets) {
+      // Don't reduce completed sets if already completed
+      return;
+    }
+    
+    // Update performance
+    setPerformance({
+      ...performance,
+      completedSets: newCompletedSets
+    });
+    
+    // Show rest timer if we have more sets and rest is defined
+    if (newCompletedSets < exercise.sets && exercise.rest) {
+      setShowRestTimer(true);
+    }
   };
   
   const handleRPEChange = (value: number) => {
@@ -257,116 +286,86 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
   }
   
   return (
-    <div className="max-w-3xl mx-auto p-4 md:p-6">
+    <div className="max-w-3xl mx-auto p-4 md:p-6 bg-black text-white">
       <div className="flex items-center mb-6">
         <button 
           onClick={() => router.back()}
-          className="p-2 rounded-full hover:bg-gray-100 mr-2"
+          className="p-2 rounded-full hover:bg-gray-800 mr-2"
           aria-label="Go back"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-5 h-5">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-5 h-5 text-white">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div>
           <div className="flex items-center">
-            <h1 className="text-2xl font-bold">{exercise.name}</h1>
-            <span className="ml-2 text-sm rounded-full px-2 py-1 bg-gray-100 text-gray-700">
+            <h1 className="text-2xl font-bold text-white">{exercise.name}</h1>
+            <span className="ml-2 text-sm rounded-full px-2 py-1 bg-[#383838] text-white">
               {exercise.group}
             </span>
           </div>
-          <p className="text-gray-600 text-sm">
+          <p className="text-gray-400 text-sm">
             {exercise.sets} sets × {formatReps(exercise.reps)} reps
             {exercise.weight && ` • ${exercise.weight} ${exercise.weightUnit || 'lb'}`}
           </p>
         </div>
       </div>
       
-      <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 mb-6">
-        <h2 className="text-xl font-medium mb-4">Exercise Information</h2>
+      {performance && (
+        <div className="mb-6">
+          <SetTracker
+            exercise={{
+              id: exercise.id,
+              name: exercise.name,
+              sets: exercise.sets,
+              targetReps: exercise.reps
+            }}
+            previousPerformance={previousPerformance}
+            currentPerformance={performance}
+            onUpdate={handleUpdatePerformance}
+            onCompleteSet={handleCompleteSet}
+          />
+        </div>
+      )}
+      
+      <div className="bg-[#2D2D2D] rounded-lg p-4 md:p-6 mb-6">
+        <h2 className="text-xl font-medium mb-4 text-white">Exercise Information</h2>
         
         {exercise.notes && (
-          <div className="mb-4 p-3 bg-yellow-50 rounded-md">
-            <h3 className="text-sm font-medium text-yellow-800 mb-1">Instructions</h3>
-            <p className="text-sm text-yellow-700">{exercise.notes}</p>
+          <div className="mb-4 p-3 bg-[#383838] rounded-md">
+            <h3 className="text-sm font-medium text-[#FC2B4E] mb-1">Instructions</h3>
+            <p className="text-sm text-white">{exercise.notes}</p>
           </div>
         )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="border border-gray-200 rounded-md p-3">
-            <h3 className="text-sm font-medium text-gray-500 mb-1">Sets & Reps</h3>
-            <p className="text-lg font-medium">{exercise.sets} sets × {formatReps(exercise.reps)} reps</p>
+          <div className="border border-[#383838] rounded-md p-3">
+            <h3 className="text-sm font-medium text-gray-400 mb-1">Sets & Reps</h3>
+            <p className="text-lg font-medium text-white">{exercise.sets} sets × {formatReps(exercise.reps)} reps</p>
           </div>
           
           {exercise.tempo && (
-            <div className="border border-gray-200 rounded-md p-3">
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Tempo</h3>
-              <p className="text-lg font-medium">{exercise.tempo}</p>
-              <p className="text-xs text-gray-500">{formatTempo(exercise.tempo)}</p>
+            <div className="border border-[#383838] rounded-md p-3">
+              <h3 className="text-sm font-medium text-gray-400 mb-1">Tempo</h3>
+              <p className="text-lg font-medium text-white">{exercise.tempo}</p>
+              <p className="text-xs text-gray-400">{formatTempo(exercise.tempo)}</p>
             </div>
           )}
           
           {exercise.rest && (
-            <div className="border border-gray-200 rounded-md p-3">
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Rest Period</h3>
-              <p className="text-lg font-medium">{exercise.rest} seconds</p>
+            <div className="border border-[#383838] rounded-md p-3">
+              <h3 className="text-sm font-medium text-gray-400 mb-1">Rest Period</h3>
+              <p className="text-lg font-medium text-white">{exercise.rest} seconds</p>
             </div>
           )}
           
           {exercise.weight && (
-            <div className="border border-gray-200 rounded-md p-3">
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Recommended Weight</h3>
-              <p className="text-lg font-medium">{exercise.weight} {exercise.weightUnit || 'lb'}</p>
+            <div className="border border-[#383838] rounded-md p-3">
+              <h3 className="text-sm font-medium text-gray-400 mb-1">Recommended Weight</h3>
+              <p className="text-lg font-medium text-white">{exercise.weight} {exercise.weightUnit || 'lb'}</p>
             </div>
           )}
         </div>
-        
-        {previousPerformance && (
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Previous Performance</h3>
-            <div className="bg-gray-50 p-3 rounded-md">
-              <div className="flex justify-between mb-1">
-                <span className="text-sm text-gray-600">
-                  {new Date(previousPerformance.workoutDate || '').toLocaleDateString()}
-                </span>
-                <div className="flex items-center">
-                  <span className="text-sm font-medium mr-1">
-                    {previousPerformance.weight} {previousPerformance.weightUnit}
-                  </span>
-                  {getWeightTrend() === 'up' && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
-                  )}
-                  {getWeightTrend() === 'down' && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  )}
-                </div>
-              </div>
-              <div className="text-sm text-gray-600">
-                {previousPerformance.completedSets} sets × 
-                {previousPerformance.completedReps.join(', ')} reps
-              </div>
-              {previousPerformance.rpe && (
-                <div className="text-sm text-gray-600 mt-1">
-                  RPE: {previousPerformance.rpe}/10
-                </div>
-              )}
-              {previousPerformance.formQuality && (
-                <div className="text-sm text-gray-600 mt-1">
-                  Form quality: {previousPerformance.formQuality}
-                </div>
-              )}
-              {previousPerformance.difficulty && (
-                <div className="text-sm text-gray-600 mt-1">
-                  Difficulty: {previousPerformance.difficulty.replace('_', ' ')}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
         
         {/* AI Suggestions Component */}
         {performance && performanceHistory.length > 0 && (
@@ -379,99 +378,11 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
         
         {performance && (
           <div>
-            <h3 className="text-lg font-medium mb-4">Track Your Performance</h3>
-            
-            {/* Weight Input */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Weight</label>
-              <div className="flex items-center">
-                <button 
-                  onClick={() => handleWeightChange(performance.weight - 5)}
-                  className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded-l-md"
-                  aria-label="Decrease weight"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                  </svg>
-                </button>
-                <input
-                  type="number"
-                  value={performance.weight}
-                  onChange={(e) => handleWeightChange(Number(e.target.value))}
-                  className="w-20 h-10 text-center border-t border-b border-gray-300"
-                  min="0"
-                  step="5"
-                />
-                <button 
-                  onClick={() => handleWeightChange(performance.weight + 5)}
-                  className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded-r-md"
-                  aria-label="Increase weight"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-                <div className="ml-3">
-                  <select
-                    value={performance.weightUnit}
-                    onChange={(e) => handleWeightUnitChange(e.target.value as 'lb' | 'kg')}
-                    className="h-10 border border-gray-300 rounded-md px-2"
-                  >
-                    <option value="lb">lb</option>
-                    <option value="kg">kg</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            
-            {/* Sets and Reps Inputs */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sets Completed: {performance.completedSets} / {performance.targetSets}
-              </label>
-              
-              <div className="space-y-3">
-                {performance.targetReps.map((targetRep, index) => (
-                  <div key={index} className="flex items-center border border-gray-200 rounded-md p-2">
-                    <span className="text-sm font-medium mr-3 min-w-10">Set {index + 1}</span>
-                    <div className="flex-1">
-                      <div className="flex items-center">
-                        <button 
-                          onClick={() => handleRepsChange(index, Math.max(0, (performance.completedReps[index] || 0) - 1))}
-                          className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded-l-md"
-                          aria-label="Decrease reps"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                          </svg>
-                        </button>
-                        <input
-                          type="number"
-                          value={performance.completedReps[index] || 0}
-                          onChange={(e) => handleRepsChange(index, Number(e.target.value))}
-                          className="w-14 h-8 text-center border-t border-b border-gray-300"
-                          min="0"
-                        />
-                        <button 
-                          onClick={() => handleRepsChange(index, (performance.completedReps[index] || 0) + 1)}
-                          className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded-r-md"
-                          aria-label="Increase reps"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-500 ml-2">Target: {targetRep}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <h3 className="text-lg font-medium mb-4 text-white">Additional Feedback</h3>
             
             {/* RPE Input */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-400 mb-2">
                 RPE (Rate of Perceived Exertion) - How hard was this exercise?
               </label>
               <div className="flex flex-wrap gap-2">
@@ -481,14 +392,14 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
                     onClick={() => handleRPEChange(value)}
                     className={`
                       w-9 h-9 rounded-full flex items-center justify-center 
-                      ${performance.rpe === value ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-indigo-100'}
+                      ${performance.rpe === value ? 'bg-[#FC2B4E] text-white' : 'bg-[#383838] text-white hover:bg-[#FC2B4E]/30'}
                     `}
                   >
                     {value}
                   </button>
                 ))}
               </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
                 <span>Very Easy</span>
                 <span>Moderate</span>
                 <span>Maximum Effort</span>
@@ -497,14 +408,14 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
             
             {/* Form Quality Assessment */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-400 mb-2">
                 Form Quality
               </label>
               <div className="flex gap-3">
                 {[
-                  { value: 'poor', label: 'Poor', color: 'bg-red-100 text-red-800 border-red-200' },
-                  { value: 'good', label: 'Good', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-                  { value: 'excellent', label: 'Excellent', color: 'bg-green-100 text-green-800 border-green-200' }
+                  { value: 'poor', label: 'Poor', color: 'bg-[#FC2B4E] text-white border-[#FC2B4E]' },
+                  { value: 'good', label: 'Good', color: 'bg-[#FC8B4E] text-white border-[#FC8B4E]' },
+                  { value: 'excellent', label: 'Excellent', color: 'bg-[#35C759] text-white border-[#35C759]' }
                 ].map((quality) => (
                   <button
                     key={quality.value}
@@ -513,7 +424,7 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
                       flex-1 py-2 px-3 rounded-md border 
                       ${performance.formQuality === quality.value 
                         ? `${quality.color} border-2` 
-                        : 'bg-gray-50 text-gray-800 border-gray-200 hover:bg-gray-100'}
+                        : 'bg-[#383838] text-white border-[#383838] hover:bg-[#2D2D2D]'}
                     `}
                   >
                     {quality.label}
@@ -524,14 +435,14 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
             
             {/* Difficulty Assessment */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-400 mb-2">
                 Difficulty Level
               </label>
               <div className="flex gap-3">
                 {[
-                  { value: 'too_easy', label: 'Too Easy', color: 'bg-green-100 text-green-800 border-green-200' },
-                  { value: 'appropriate', label: 'Just Right', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-                  { value: 'too_hard', label: 'Too Hard', color: 'bg-red-100 text-red-800 border-red-200' }
+                  { value: 'too_easy', label: 'Too Easy', color: 'bg-[#35C759] text-white border-[#35C759]' },
+                  { value: 'appropriate', label: 'Just Right', color: 'bg-[#4E85FC] text-white border-[#4E85FC]' },
+                  { value: 'too_hard', label: 'Too Hard', color: 'bg-[#FC2B4E] text-white border-[#FC2B4E]' }
                 ].map((difficulty) => (
                   <button
                     key={difficulty.value}
@@ -540,7 +451,7 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
                       flex-1 py-2 px-3 rounded-md border 
                       ${performance.difficulty === difficulty.value 
                         ? `${difficulty.color} border-2` 
-                        : 'bg-gray-50 text-gray-800 border-gray-200 hover:bg-gray-100'}
+                        : 'bg-[#383838] text-white border-[#383838] hover:bg-[#2D2D2D]'}
                     `}
                   >
                     {difficulty.label}
@@ -551,7 +462,7 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
             
             {/* Common Issues */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-400 mb-2">
                 Did you experience any issues? (Optional)
               </label>
               <div className="flex flex-wrap gap-2">
@@ -568,8 +479,8 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
                     className={`
                       py-1 px-3 rounded-full border 
                       ${performance.issues?.includes(issue.value as any)
-                        ? 'bg-gray-800 text-white border-gray-800' 
-                        : 'bg-gray-50 text-gray-800 border-gray-200 hover:bg-gray-100'}
+                        ? 'bg-[#FC2B4E] text-white border-[#FC2B4E]' 
+                        : 'bg-[#383838] text-white border-[#383838] hover:bg-[#2D2D2D]'}
                       text-sm
                     `}
                   >
@@ -581,13 +492,13 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
             
             {/* Notes Field */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-400 mb-2">
                 Notes (Optional)
               </label>
               <textarea
                 value={performance.notes || ''}
                 onChange={(e) => handleNotesChange(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 h-24 resize-none"
+                className="w-full bg-[#383838] border border-[#383838] rounded-md px-3 py-2 h-24 resize-none text-white"
                 placeholder="Any comments about your performance..."
               />
             </div>
@@ -597,8 +508,8 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
                 onClick={handleSavePerformance}
                 disabled={isSubmitting}
                 className={`
-                  px-4 py-2 bg-green-600 text-white rounded-md 
-                  ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-green-700'}
+                  px-4 py-2 bg-[#35C759] text-white rounded-md 
+                  ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#35C759]/90'}
                 `}
               >
                 {isSubmitting ? 'Saving...' : 'Complete Exercise'}
@@ -607,6 +518,16 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
           </div>
         )}
       </div>
+      
+      {/* Rest Timer Modal */}
+      {exercise.rest && (
+        <RestTimer
+          initialTime={exercise.rest}
+          isOpen={showRestTimer}
+          onComplete={() => setShowRestTimer(false)}
+          onCancel={() => setShowRestTimer(false)}
+        />
+      )}
     </div>
   );
 } 

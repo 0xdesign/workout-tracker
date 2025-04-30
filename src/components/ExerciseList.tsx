@@ -34,7 +34,7 @@ export function ExerciseList({ workoutDay, date }: ExerciseListProps) {
     return String(reps);
   };
   
-  const renderExerciseCard = (exercise: ExerciseType) => {
+  const renderExerciseCard = (exercise: ExerciseType, index: number) => {
     const href = date 
       ? `/exercise/${exercise.id}?date=${date}&workoutId=${workoutDay.id}`
       : `/exercise/${exercise.id}?workoutId=${workoutDay.id}`;
@@ -43,12 +43,16 @@ export function ExerciseList({ workoutDay, date }: ExerciseListProps) {
       <Link
         href={href}
         key={exercise.id}
-        className="block bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow"
+        className="block bg-[#383838] rounded-lg p-4 hover:bg-[#3D3D3D] transition-all duration-200 transform hover:scale-[1.02] border border-[#3D3D3D]"
+        style={{ 
+          animationDelay: `${index * 50}ms`,
+          animation: 'fadeInUp 0.5s ease forwards'
+        }}
       >
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="font-medium">{exercise.name}</h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <h3 className="font-medium text-white">{exercise.name}</h3>
+            <p className="text-sm text-gray-400 mt-1">
               {exercise.sets} sets × {formatReps(exercise.reps)} reps
               {exercise.weight && ` • ${exercise.weight} ${exercise.weightUnit || 'lb'}`}
             </p>
@@ -58,7 +62,7 @@ export function ExerciseList({ workoutDay, date }: ExerciseListProps) {
               </p>
             )}
           </div>
-          <div className="text-sm rounded-full px-2 py-1 bg-gray-100 text-gray-700">
+          <div className="text-sm rounded-full px-2 py-1 bg-[#FC2B4E] text-white">
             {exercise.group}
           </div>
         </div>
@@ -67,6 +71,14 @@ export function ExerciseList({ workoutDay, date }: ExerciseListProps) {
             {exercise.notes}
           </p>
         )}
+        <div className="mt-2 flex justify-end">
+          <div className="flex items-center text-[#35C759] text-xs">
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+            View Details
+          </div>
+        </div>
       </Link>
     );
   };
@@ -81,13 +93,17 @@ export function ExerciseList({ workoutDay, date }: ExerciseListProps) {
     });
     
     return (
-      <div key={groupPrefix} className="mb-6">
-        <h3 className="text-sm font-medium text-gray-500 mb-2">
+      <div key={groupPrefix} className="mb-6 animate-fadeIn" style={{ animationDelay: '100ms' }}>
+        <h3 className="text-sm font-medium text-gray-400 mb-2">
           Group {groupPrefix}
-          {exercises[0].rest && ` • Rest: ${exercises[0].rest}s between supersets`}
+          {exercises[0].rest && (
+            <span className="ml-2 text-[#FC2B4E]">
+              {exercises[0].rest}s rest
+            </span>
+          )}
         </h3>
         <div className="grid grid-cols-1 gap-4">
-          {sortedExercises.map(renderExerciseCard)}
+          {sortedExercises.map((exercise, index) => renderExerciseCard(exercise, index))}
         </div>
       </div>
     );

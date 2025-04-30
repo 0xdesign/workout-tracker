@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { WorkoutDataProvider } from "@/providers/WorkoutDataProvider";
+import { BottomNav } from "@/components/BottomNav";
 import Script from "next/script";
 
 const geistSans = Geist({
@@ -20,13 +21,13 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Workout Tracker",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4f46e5",
+  themeColor: "#1F1F1F",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -44,10 +45,13 @@ export default function RootLayout({
         <Script src="/disable-wallet-conflicts.js" strategy="beforeInteractive" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#1F1F1F]`}
       >
         <WorkoutDataProvider>
-          {children}
+          <main className="pb-20">
+            {children}
+          </main>
+          <BottomNav />
         </WorkoutDataProvider>
       </body>
     </html>
