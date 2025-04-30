@@ -14,7 +14,8 @@ interface WorkoutDetailPageProps {
 }
 
 export default function WorkoutDetailPage({ params }: WorkoutDetailPageProps) {
-  const { id } = params;
+  // Extract id directly to avoid Next.js warning about synchronous params usage
+  const workoutId = params.id;
   const router = useRouter();
   const searchParams = useSearchParams();
   const date = searchParams.get('date');
@@ -24,12 +25,12 @@ export default function WorkoutDetailPage({ params }: WorkoutDetailPageProps) {
   
   useEffect(() => {
     if (workoutPlan) {
-      const day = workoutPlan.days.find(day => day.id === id);
+      const day = workoutPlan.days.find(day => day.id === workoutId);
       if (day) {
         setWorkoutDay(day);
       }
     }
-  }, [workoutPlan, id]);
+  }, [workoutPlan, workoutId]);
   
   if (isLoading) {
     return (
@@ -105,7 +106,7 @@ export default function WorkoutDetailPage({ params }: WorkoutDetailPageProps) {
         
         {date && (
           <Link
-            href={`/workout/${id}/summary?date=${date}`}
+            href={`/workout/${workoutId}/summary?date=${date}`}
             className="px-4 py-2 bg-[#FC2B4E] text-white rounded-md hover:bg-[#E02646] transition-colors"
           >
             Complete Workout

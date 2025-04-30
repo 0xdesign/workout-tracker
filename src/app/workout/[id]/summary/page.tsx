@@ -18,7 +18,7 @@ interface Achievement {
 }
 
 export default function WorkoutSummaryPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+  const workoutId = params.id;
   const router = useRouter();
   const searchParams = useSearchParams();
   const date = searchParams.get('date');
@@ -32,14 +32,14 @@ export default function WorkoutSummaryPage({ params }: { params: { id: string } 
   
   useEffect(() => {
     const loadData = async () => {
-      if (!id || !date) {
+      if (!workoutId || !date) {
         setLoadingState('error');
         return;
       }
       
       try {
         // Get current workout performance
-        const performance = await workoutService.getWorkoutPerformance(id, date);
+        const performance = await workoutService.getWorkoutPerformance(workoutId, date);
         if (!performance) {
           setLoadingState('error');
           return;
@@ -47,7 +47,7 @@ export default function WorkoutSummaryPage({ params }: { params: { id: string } 
         setWorkoutPerformance(performance);
         
         // Get previous performances for comparison
-        const previousPerfs = await workoutService.getWorkoutPerformancesForDay(id);
+        const previousPerfs = await workoutService.getWorkoutPerformancesForDay(workoutId);
         // Filter out current performance if it exists in history
         const filteredPerfs = previousPerfs.filter(perf => perf.id !== performance.id);
         setPreviousPerformances(filteredPerfs);
@@ -132,7 +132,7 @@ export default function WorkoutSummaryPage({ params }: { params: { id: string } 
     };
     
     loadData();
-  }, [id, date, workoutPlan]);
+  }, [workoutId, date, workoutPlan]);
   
   if (loadingState === 'loading' || isLoading) {
     return (
@@ -200,7 +200,7 @@ export default function WorkoutSummaryPage({ params }: { params: { id: string } 
           workoutPerformance={workoutPerformance}
           exerciseTypes={exerciseTypes}
           previousPerformances={previousPerformances}
-          onViewWorkoutDetails={() => router.push(`/workout/${id}?date=${date}`)}
+          onViewWorkoutDetails={() => router.push(`/workout/${workoutId}?date=${date}`)}
         />
         
         <div className="mt-8 flex justify-center">

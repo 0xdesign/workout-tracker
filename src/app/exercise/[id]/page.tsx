@@ -19,7 +19,8 @@ interface ExerciseDetailPageProps {
 }
 
 export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) {
-  const { id } = params;
+  // Extract id directly to avoid Next.js warning about synchronous params usage
+  const exerciseId = params.id;
   const router = useRouter();
   const searchParams = useSearchParams();
   const date = searchParams.get('date');
@@ -39,14 +40,14 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
     if (workoutPlan) {
       // Find the exercise in any of the workout days
       for (const day of workoutPlan.days) {
-        const foundExercise = day.exercises.find(ex => ex.id === id);
+        const foundExercise = day.exercises.find(ex => ex.id === exerciseId);
         if (foundExercise) {
           setExercise(foundExercise);
           break;
         }
       }
     }
-  }, [workoutPlan, id]);
+  }, [workoutPlan, exerciseId]);
   
   // Load performance data for this exercise
   useEffect(() => {
@@ -61,14 +62,14 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
           setWorkoutPerformance(perf);
           
           // Find this specific exercise's performance
-          const exercisePerf = perf.exercises.find((ex: ExercisePerformance) => ex.exerciseId === id);
+          const exercisePerf = perf.exercises.find((ex: ExercisePerformance) => ex.exerciseId === exerciseId);
           if (exercisePerf) {
             setPerformance(exercisePerf);
           }
         }
         
         // Get previous performance for comparison and AI suggestions
-        const history = await workoutService.getExercisePerformanceHistory(id, 5); // Get last 5 performances
+        const history = await workoutService.getExercisePerformanceHistory(exerciseId, 5); // Get last 5 performances
         if (history.length > 0) {
           setPreviousPerformance(history[0]);
           setPerformanceHistory(history);
@@ -79,7 +80,7 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
     };
     
     loadPerformanceData();
-  }, [exercise, workoutId, date, id]);
+  }, [exercise, workoutId, date, exerciseId]);
   
   const formatReps = (reps: number | number[] | string): string => {
     if (Array.isArray(reps)) {
@@ -225,7 +226,7 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
       
       // Update the exercise performance in the workout performance
       const updatedExercises = workoutPerformance.exercises.map(ex => 
-        ex.exerciseId === id ? performance : ex
+        ex.exerciseId === exerciseId ? performance : ex
       );
       
       const updatedWorkoutPerformance = {
@@ -261,22 +262,22 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
   
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-        <p className="mt-4 text-gray-600">Loading exercise details...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-black">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FC2B4E]"></div>
+        <p className="mt-4 text-gray-400">Loading exercise details...</p>
       </div>
     );
   }
   
   if (error || !exercise) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="p-4 bg-red-50 text-red-800 rounded-lg max-w-lg">
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-black">
+        <div className="p-4 bg-[#2D2D2D] text-white rounded-lg max-w-lg">
           <h2 className="text-lg font-medium mb-2">Error Loading Exercise</h2>
-          <p>{error || "Exercise not found"}</p>
+          <p className="text-white">{error || "Exercise not found"}</p>
           <Link 
             href="/"
-            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 inline-block"
+            className="mt-4 px-4 py-2 bg-[#FC2B4E] text-white rounded-md hover:bg-[#E02646] inline-block"
           >
             Back to Home
           </Link>
@@ -370,7 +371,7 @@ export default function ExerciseDetailPage({ params }: ExerciseDetailPageProps) 
         {/* AI Suggestions Component */}
         {performance && performanceHistory.length > 0 && (
           <AISuggestions
-            exerciseId={id}
+            exerciseId={exerciseId}
             performanceHistory={performanceHistory}
             onApplySuggestion={handleApplySuggestion}
           />
