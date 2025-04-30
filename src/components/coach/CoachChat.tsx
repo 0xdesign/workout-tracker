@@ -9,6 +9,8 @@ import { useWorkoutData } from '@/providers/WorkoutDataProvider';
 import MessageBubble from './MessageBubble';
 import QuickPrompts from './QuickPrompts';
 import WorkoutModifications from './WorkoutModifications';
+import { WorkoutChangeProposal } from './WorkoutChangeProposal';
+import { ProgramChangeNotification } from './ProgramChangeNotification';
 
 interface CoachChatProps {
   initialContext?: ChatContext;
@@ -26,7 +28,12 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
   // New state for workout modifications
   const [workoutModifications, setWorkoutModifications] = useState<WorkoutCoachResponse | null>(null);
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutPerformance | null>(null);
-  const [showingModifications, setShowingModifications] = useState(false);
+  const [programChanges, setProgramChanges] = useState<{
+    title: string;
+    description: string;
+    timestamp: string;
+    changeType: 'add' | 'remove' | 'modify' | 'program';
+  } | null>(null);
   
   const { refreshData } = useWorkoutData();
   
@@ -83,17 +90,15 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
     scrollToBottom();
   }, [conversation?.messages]);
   
-  // Send a message to the AI coach
-  const sendMessage = async (content: string) => {
-    if (!content.trim() || !conversation) return;
-    setIsLoading(true);
-    setError(null);
+  // Add a message to the conversation
+  const addMessageToConversation = async (role: 'user' | 'assistant', content: string) => {
+    if (!conversation) return null;
     
     try {
-      // Add user message to conversation
-      const userMessage = await coachService.addMessage(
+      // Add message to conversation
+      const message = await coachService.addMessage(
         conversation.id,
-        'user',
+        role,
         content
       );
       
@@ -102,9 +107,27 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
         if (!prev) return null;
         return {
           ...prev,
-          messages: [...prev.messages, userMessage]
+          messages: [...prev.messages, message]
         };
       });
+      
+      return message;
+    } catch (err) {
+      console.error('Error adding message:', err);
+      return null;
+    }
+  };
+  
+  // Send a message to the AI coach
+  const sendMessage = async (content: string) => {
+    if (!content.trim() || !conversation) return;
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Add user message to conversation
+      const userMessage = await addMessageToConversation('user', content);
+      if (!userMessage) throw new Error('Failed to add user message');
       
       // Clear input
       setInputMessage('');
@@ -117,20 +140,7 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
       
       if (aiResponse) {
         // Add AI response to conversation
-        const assistantMessage = await coachService.addMessage(
-          conversation.id,
-          'assistant',
-          aiResponse
-        );
-        
-        // Update local state
-        setConversation(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            messages: [...prev.messages, assistantMessage]
-          };
-        });
+        await addMessageToConversation('assistant', aiResponse);
       }
     } catch (err) {
       console.error('Error sending message:', err);
@@ -189,8 +199,14 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
       );
       
       if (modifications) {
+        // Instead of showing in an overlay, include it in the conversation flow
         setWorkoutModifications(modifications);
-        setShowingModifications(true);
+        
+        // Add a message from the assistant introducing the changes
+        await addMessageToConversation(
+          'assistant',
+          'I\'ve analyzed your workout and have some suggested modifications. Please review them below:'
+        );
       } else {
         throw new Error('Failed to generate modifications');
       }
@@ -204,47 +220,93 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
   
   // Handle applying workout modifications
   const handleApplyModifications = async () => {
-    setShowingModifications(false);
+    if (!conversation || !workoutModifications || !selectedWorkout) return;
     
-    // Add a message indicating the modifications were applied
-    if (conversation && workoutModifications) {
-      await coachService.addMessage(
-        conversation.id,
+    setIsLoading(true);
+    
+    try {
+      // Create a copy of the workout to modify
+      const modifiedWorkout = JSON.parse(JSON.stringify(selectedWorkout)) as WorkoutPerformance;
+      
+      // Apply all selected changes
+      workoutModifications.modifications.forEach(mod => {
+        const exerciseIndex = modifiedWorkout.exercises.findIndex(ex => ex.exerciseId === mod.exerciseId);
+        
+        if (exerciseIndex !== -1) {
+          mod.changes.forEach(change => {
+            switch (change.parameter) {
+              case 'weight':
+                modifiedWorkout.exercises[exerciseIndex].weight = Number(change.recommendedValue);
+                break;
+              case 'sets':
+                modifiedWorkout.exercises[exerciseIndex].targetSets = Number(change.recommendedValue);
+                break;
+              case 'reps':
+                if (Array.isArray(change.recommendedValue)) {
+                  modifiedWorkout.exercises[exerciseIndex].targetReps = change.recommendedValue;
+                } else {
+                  const currentLength = modifiedWorkout.exercises[exerciseIndex].targetReps.length;
+                  modifiedWorkout.exercises[exerciseIndex].targetReps = Array(currentLength).fill(Number(change.recommendedValue));
+                }
+                break;
+            }
+          });
+        }
+      });
+      
+      // Save the modified workout
+      await workoutService.recordWorkoutPerformance(modifiedWorkout);
+      
+      // Add a confirmation message
+      await addMessageToConversation(
         'assistant',
         'I\'ve applied your selected modifications to the workout. The changes will be reflected the next time you perform this workout.'
       );
       
-      // Update local state
-      setConversation(prev => {
-        if (!prev) return null;
-        
-        const newMessage: Message = {
-          id: 'temp-' + Date.now(),
-          role: 'assistant',
-          content: 'I\'ve applied your selected modifications to the workout. The changes will be reflected the next time you perform this workout.',
-          timestamp: Date.now()
-        };
-        
-        return {
-          ...prev,
-          messages: [...prev.messages, newMessage]
-        };
+      // Show program change notification
+      setProgramChanges({
+        title: 'Workout Changes Applied',
+        description: 'Your workout has been updated with the approved changes.',
+        timestamp: new Date().toLocaleTimeString(),
+        changeType: 'modify'
       });
       
       // Refresh workout data
       refreshData();
+      
+      // Reset modifications state
+      setWorkoutModifications(null);
+      setSelectedWorkout(null);
+    } catch (err) {
+      console.error('Error applying modifications:', err);
+      setError('Failed to apply modifications. Please try again.');
+      
+      // Add an error message
+      await addMessageToConversation(
+        'assistant',
+        'Sorry, there was an error applying the modifications. Please try again.'
+      );
+    } finally {
+      setIsLoading(false);
     }
+  };
+  
+  // Handle rejecting workout modifications
+  const handleRejectModifications = async () => {
+    // Add a message indicating the rejection
+    await addMessageToConversation(
+      'assistant',
+      'No problem. Let me know if you want different modifications or have other questions about your workout.'
+    );
     
     // Reset modifications state
     setWorkoutModifications(null);
     setSelectedWorkout(null);
   };
   
-  // Handle canceling workout modifications
-  const handleCancelModifications = () => {
-    setShowingModifications(false);
-    setWorkoutModifications(null);
-    setSelectedWorkout(null);
+  // Handle dismissing program change notification
+  const handleDismissProgramChange = () => {
+    setProgramChanges(null);
   };
   
   // Parse message content for workout modification requests
@@ -282,43 +344,45 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
   };
   
   return (
-    <div className="flex flex-col h-full max-h-[600px] bg-white border border-gray-200 rounded-lg shadow-sm">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <h2 className="text-lg font-medium text-gray-900">AI Coach</h2>
-        <p className="text-sm text-gray-500">Get personalized workout advice</p>
-      </div>
-      
+    <div className="flex flex-col h-full max-h-[600px] bg-[#1F1F1F] border border-[#383838] rounded-lg shadow-sm">
       {/* Chat messages */}
       <div className="flex-1 overflow-y-auto p-4">
-        {showingModifications && workoutModifications && selectedWorkout ? (
-          <WorkoutModifications
-            modifications={workoutModifications}
-            workout={selectedWorkout}
-            onApply={handleApplyModifications}
-            onCancel={handleCancelModifications}
-          />
-        ) : (
-          <>
-            {conversation?.messages && conversation.messages.length > 0 ? (
-              conversation.messages.map(message => (
-                <MessageBubble key={message.id} message={message} />
-              ))
-            ) : (
-              <div className="flex justify-center items-center h-full">
-                <div className="text-center text-gray-500">
-                  <p className="mb-2">How can I help with your workout today?</p>
-                  <p className="text-sm">Ask about exercise modifications, form tips, or program adjustments.</p>
-                </div>
-              </div>
+        {conversation?.messages && conversation.messages.length > 0 ? (
+          <div className="space-y-4">
+            {conversation.messages.map(message => (
+              <MessageBubble key={message.id} message={message} />
+            ))}
+            
+            {/* Workout modification proposal */}
+            {workoutModifications && (
+              <WorkoutChangeProposal
+                modifications={workoutModifications}
+                onAccept={handleApplyModifications}
+                onReject={handleRejectModifications}
+              />
             )}
             
-            {error && (
-              <div className="bg-red-50 text-red-700 text-sm p-3 rounded-md mb-4">
-                {error}
-              </div>
+            {/* Program change notification */}
+            {programChanges && (
+              <ProgramChangeNotification
+                changes={programChanges}
+                onDismiss={handleDismissProgramChange}
+              />
             )}
-          </>
+          </div>
+        ) : (
+          <div className="flex justify-center items-center h-full">
+            <div className="text-center text-gray-400">
+              <p className="mb-2">How can I help with your workout today?</p>
+              <p className="text-sm">Ask about exercise modifications, form tips, or program adjustments.</p>
+            </div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="bg-red-900/30 text-red-400 text-sm p-3 rounded-md mb-4">
+            {error}
+          </div>
         )}
         
         <div ref={messagesEndRef} />
@@ -330,7 +394,7 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
       </div>
       
       {/* Input area */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-[#383838] p-4">
         <form onSubmit={handleSubmit} className="flex">
           <input
             type="text"
@@ -338,12 +402,12 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
             onChange={(e) => setInputMessage(e.target.value)}
             disabled={isLoading}
             placeholder="Type your message..."
-            className="flex-1 rounded-l-md border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="flex-1 rounded-l-md border border-[#383838] bg-[#2D2D2D] p-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FC2B4E] focus:border-transparent"
           />
           <button
             type="submit"
             disabled={isLoading || !inputMessage.trim()}
-            className="bg-indigo-600 text-white rounded-r-md px-4 py-2 disabled:bg-indigo-400"
+            className="bg-[#FC2B4E] text-white rounded-r-md px-4 py-2 disabled:bg-[#FC2B4E]/40"
           >
             {isLoading ? (
               <span className="flex items-center">

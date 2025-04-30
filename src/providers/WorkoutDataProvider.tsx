@@ -83,8 +83,10 @@ export function WorkoutDataProvider({ children }: WorkoutDataProviderProps) {
         
         // Save the plan to IndexedDB
         try {
-          await workoutService.savePlan(plan);
-          console.log('Workout plan saved to IndexedDB');
+          if (plan) {
+            await workoutService.savePlan(plan);
+            console.log('Workout plan saved to IndexedDB');
+          }
         } catch (dbError) {
           console.warn('Failed to save workout plan to IndexedDB:', dbError);
           // Continue anyway since we have the plan in memory
@@ -95,10 +97,12 @@ export function WorkoutDataProvider({ children }: WorkoutDataProviderProps) {
       if (plan) {
         setWorkoutPlan(plan);
         
-        // Generate workoutDaysByDate mapping for the current month
+        // Generate workoutDaysByDate mapping for an extended date range (3 months back, 3 months forward)
         const today = new Date();
-        const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-        const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        
+        // Create a date range spanning 3 months back and 3 months forward
+        const startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1); // 2 months back
+        const endDate = new Date(today.getFullYear(), today.getMonth() + 4, 0);   // 3 months forward (end of 3rd month)
         
         const daysByDate: Record<string, WorkoutDay> = {};
         
@@ -114,16 +118,18 @@ export function WorkoutDataProvider({ children }: WorkoutDataProviderProps) {
         
         setWorkoutDaysByDate(daysByDate);
         
-        // Load workout completion status
-        await loadWorkoutCompletionStatus(daysByDate);
+        // Load workout completion status for the extended date range
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        await loadWorkoutCompletionStatus(daysByDate, startDateStr, endDateStr);
         
         // Load recent workouts for use in the coach component
         const twoWeeksAgo = new Date();
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-        const startDateStr = twoWeeksAgo.toISOString().split('T')[0];
-        const endDateStr = new Date().toISOString().split('T')[0];
+        const recentStartDateStr = twoWeeksAgo.toISOString().split('T')[0];
+        const todayDateStr = new Date().toISOString().split('T')[0];
         
-        const recent = await workoutService.getWorkoutPerformancesByDateRange(startDateStr, endDateStr);
+        const recent = await workoutService.getWorkoutPerformancesByDateRange(recentStartDateStr, todayDateStr);
         setRecentWorkouts(recent.filter(wp => wp.exercises.some(ex => ex.completedSets > 0)));
       } else {
         setError('No workout plan available. Please create one first.');
@@ -136,11 +142,18 @@ export function WorkoutDataProvider({ children }: WorkoutDataProviderProps) {
     }
   }, []);
   
-  const loadWorkoutCompletionStatus = async (daysByDate: Record<string, WorkoutDay>) => {
+  const loadWorkoutCompletionStatus = async (
+    daysByDate: Record<string, WorkoutDay>,
+    startDate?: string,
+    endDate?: string
+  ) => {
     try {
-      const today = new Date();
-      const startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-      const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+      // If dates are not provided, use the current month
+      if (!startDate || !endDate) {
+        const today = new Date();
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+      }
       
       const performances = await workoutService.getWorkoutPerformancesByDateRange(startDate, endDate);
       

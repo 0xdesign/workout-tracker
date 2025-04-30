@@ -85,42 +85,7 @@ export function CalendarStrip({
   
   return (
     <div className="w-full max-w-full bg-[#1F1F1F] rounded-lg p-3 text-white">
-      {/* Header with month and navigation */}
-      <div className="flex justify-between items-center mb-3 px-1">
-        <button 
-          onClick={prevWeek}
-          className="p-2 rounded-full hover:bg-[#2D2D2D] text-white transition-colors"
-          aria-label="Previous week"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        
-        <div className="flex flex-col items-center">
-          <span className="text-sm font-medium">
-            {weekRange().startFormatted} - {weekRange().endFormatted}
-          </span>
-          <button 
-            onClick={goToToday} 
-            className="text-xs text-[#FC2B4E] hover:text-white font-medium mt-1 transition-colors"
-          >
-            Today
-          </button>
-        </div>
-        
-        <button 
-          onClick={nextWeek}
-          className="p-2 rounded-full hover:bg-[#2D2D2D] text-white transition-colors"
-          aria-label="Next week"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-      
-      {/* Scrollable days strip */}
+      {/* Scrollable days strip - Previous header with month and navigation removed */}
       <div 
         ref={scrollContainerRef}
         className="flex overflow-x-auto no-scrollbar py-1 -mx-1 px-1"

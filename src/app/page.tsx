@@ -68,27 +68,8 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col p-4 md:p-6 bg-[#1F1F1F] text-white">
       <div className="max-w-3xl mx-auto w-full">
-        <header className="mb-6 animate-fadeIn">
-          <h1 className="text-2xl md:text-3xl font-bold text-white">Workout Tracker</h1>
-          <p className="text-gray-300 mt-1">Track your progress and stay on plan</p>
-        </header>
-        
-        {/* Today's Workout (Hero Section) */}
-        {todayWorkout && (
-          <section className="mb-6 animate-fadeIn" style={{ animationDelay: '100ms' }}>
-            <h2 className="text-lg font-bold mb-3 text-white">Today's Workout</h2>
-            <WorkoutCard 
-              workout={todayWorkout} 
-              date={todayDate}
-              isCompleted={workoutCompletionStatus[todayDate]}
-              workoutType={getWorkoutType(todayWorkout.name)}
-            />
-          </section>
-        )}
-        
-        {/* Calendar Strip */}
-        <section className="mb-6 animate-fadeIn" style={{ animationDelay: '200ms' }}>
-          <h2 className="text-lg font-bold mb-3 text-white">Weekly Schedule</h2>
+        {/* Calendar Strip moved to the top */}
+        <section className="mb-6 animate-fadeIn">
           <CalendarStrip 
             workoutDaysByDate={workoutDaysByDate}
             workoutCompletionStatus={workoutCompletionStatus}
@@ -97,12 +78,12 @@ export default function Home() {
         </section>
         
         {/* Recent Workouts */}
-        <section className="mb-6 animate-fadeIn" style={{ animationDelay: '300ms' }}>
+        <section className="mb-6 animate-fadeIn" style={{ animationDelay: '200ms' }}>
           <RecentWorkouts />
         </section>
         
         {/* Stats and AI Coach */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn" style={{ animationDelay: '400ms' }}>
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn" style={{ animationDelay: '300ms' }}>
           <div className="bg-[#2D2D2D] rounded-lg p-4 md:p-6 hover:shadow-lg transition-shadow transform hover:scale-[1.01] duration-200">
             <h2 className="text-xl font-bold mb-4 text-white">Progress Overview</h2>
             <div className="flex items-center justify-center h-32 rounded-lg bg-[#383838] text-center p-4">
