@@ -9,27 +9,34 @@ interface CalendarStripProps {
   workoutDaysByDate?: Record<string, WorkoutDay>;
   workoutCompletionStatus?: Record<string, boolean>;
   onSelectDate?: (date: string) => void;
+  selectedDate?: string | null;
 }
 
 export function CalendarStrip({
   workoutDaysByDate = {},
   workoutCompletionStatus = {},
-  onSelectDate
+  onSelectDate,
+  selectedDate: externalSelectedDate = null
 }: CalendarStripProps) {
   const { weekDays, nextWeek, prevWeek, goToToday, weekRange } = useWeekNavigation();
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [internalSelectedDate, setInternalSelectedDate] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   
-  // Initialize with today's date
+  // Use the external selectedDate if provided, otherwise use internal state
+  const selectedDate = externalSelectedDate !== null ? externalSelectedDate : internalSelectedDate;
+  
+  // Initialize with today's date if no external selectedDate is provided
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    setSelectedDate(today);
-    onSelectDate?.(today);
+    if (externalSelectedDate === null) {
+      const today = new Date().toISOString().split('T')[0];
+      setInternalSelectedDate(today);
+      onSelectDate?.(today);
+    }
     
     // Scroll to today on initial render
     scrollToCurrentDay();
-  }, [onSelectDate]);
+  }, [externalSelectedDate, onSelectDate]);
   
   // Scroll to the currently selected day when week changes
   useEffect(() => {
@@ -39,6 +46,24 @@ export function CalendarStrip({
   const scrollToCurrentDay = () => {
     if (!scrollContainerRef.current) return;
     
+    // First try to scroll to selected date
+    if (selectedDate) {
+      const selectedElement = scrollContainerRef.current.querySelector(`[data-date="${selectedDate}"]`);
+      if (selectedElement) {
+        const scrollPosition = selectedElement.getBoundingClientRect().left - 
+          scrollContainerRef.current.getBoundingClientRect().left - 
+          (scrollContainerRef.current.offsetWidth / 2) + 
+          (selectedElement as HTMLElement).offsetWidth / 2;
+        
+        scrollContainerRef.current.scrollTo({
+          left: scrollContainerRef.current.scrollLeft + scrollPosition,
+          behavior: 'smooth'
+        });
+        return;
+      }
+    }
+    
+    // Fallback to scrolling to today
     const todayElement = scrollContainerRef.current.querySelector('[data-today="true"]');
     if (todayElement) {
       const scrollPosition = todayElement.getBoundingClientRect().left - 
@@ -54,7 +79,10 @@ export function CalendarStrip({
   };
   
   const handleDateClick = (isoDate: string) => {
-    setSelectedDate(isoDate);
+    console.log(`CalendarStrip: Date clicked: ${isoDate}`);
+    if (externalSelectedDate === null) {
+      setInternalSelectedDate(isoDate);
+    }
     onSelectDate?.(isoDate);
   };
   
@@ -102,6 +130,7 @@ export function CalendarStrip({
             <button
               key={day.isoDate}
               data-today={isToday}
+              data-date={day.isoDate}
               onClick={() => handleDateClick(day.isoDate)}
               className={`
                 flex-shrink-0 w-16 h-16 mx-1 flex flex-col items-center justify-center rounded-xl transition-all

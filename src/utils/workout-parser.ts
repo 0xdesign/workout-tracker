@@ -17,6 +17,7 @@ export function parseWorkoutPlan(markdown: string): WorkoutPlan {
   
   let currentDay: WorkoutDay | null = null;
   let currentCategory: 'mobility' | 'main' | 'auxiliary' = 'main';
+  let inLowerBodySection = false; // Track if we're in a Lower Body Components section
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -55,9 +56,42 @@ export function parseWorkoutPlan(markdown: string): WorkoutPlan {
           exercises: [],
           day: dayNumber
         };
+      } else if (line.includes('BIKE AND ABS')) {
+        // Special case for Bike and Abs day
+        const dayMatch = line.match(/## DAY (\d+)/);
+        const dayNumber = dayMatch ? parseInt(dayMatch[1]) : currentPlan.days.length + 1;
+        
+        currentDay = {
+          id: uuidv4(),
+          name: 'Bike and Abs',
+          exercises: [],
+          day: dayNumber
+        };
+        
+        // Add default exercises for Bike and Abs
+        currentDay.exercises.push({
+          id: uuidv4(),
+          name: 'Bike Cardio',
+          sets: 1,
+          reps: '30 minutes',
+          group: 'A1',
+          category: 'main',
+          notes: 'Moderate intensity, aim for consistent pace'
+        });
+        
+        currentDay.exercises.push({
+          id: uuidv4(),
+          name: 'Ab Circuit',
+          sets: 3,
+          reps: '12-15',
+          group: 'A2',
+          category: 'main',
+          notes: 'Choose 3-4 ab exercises per circuit'
+        });
       }
       
       currentCategory = 'main';
+      inLowerBodySection = false;
       continue;
     }
     
@@ -69,11 +103,22 @@ export function parseWorkoutPlan(markdown: string): WorkoutPlan {
         currentCategory = 'mobility';
       } else if (category.includes('main')) {
         currentCategory = 'main';
+      } else if (category.includes('lower body components')) {
+        // Set flag when entering Lower Body Components section
+        inLowerBodySection = true;
+        currentCategory = 'main'; // Reset category
+        continue; // Skip adding exercises from this section to the current day
       } else {
         // Anything else is considered auxiliary
         currentCategory = 'auxiliary';
       }
       
+      continue;
+    }
+    
+    // Skip processing exercises if we're in the Lower Body Components section
+    // or if we don't have a current day
+    if (inLowerBodySection || !currentDay) {
       continue;
     }
     
@@ -151,6 +196,16 @@ export function parseWorkoutPlan(markdown: string): WorkoutPlan {
   if (currentDay) {
     currentPlan.days.push(currentDay);
   }
+  
+  // Log the parsed plan for debugging
+  console.log('Parsed workout plan:', {
+    name: currentPlan.name,
+    dayCount: currentPlan.days.length,
+    days: currentPlan.days.map(day => ({
+      name: day.name,
+      exerciseCount: day.exercises.length
+    }))
+  });
   
   return currentPlan;
 }

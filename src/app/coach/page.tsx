@@ -7,6 +7,7 @@ import * as coachService from '@/lib/coach-service';
 import CoachChat from '@/components/coach/CoachChat';
 import EquipmentProfile from '@/components/coach/EquipmentProfile';
 import { useWorkoutData } from '@/providers/WorkoutDataProvider';
+import { Loader2, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 
 export default function CoachPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -81,47 +82,59 @@ export default function CoachPage() {
     setShowEquipmentProfile(false);
   };
   
+  // Toggle equipment profile visibility
+  const toggleEquipmentProfile = () => {
+    setShowEquipmentProfile(!showEquipmentProfile);
+  };
+  
   return (
-    <main className="flex min-h-screen flex-col p-4 md:p-6">
-      <div className="max-w-4xl mx-auto w-full">
-        <header className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">AI Coach</h1>
-          <p className="text-gray-600 mt-1">Get personalized workout advice and program modifications</p>
-        </header>
-        
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {/* Equipment toggle - simplified UI */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
+    <div className="flex flex-col min-h-screen bg-[#1F1F1F] text-white">
+      {/* Header */}
+      <header className="px-4 py-6 border-b border-[#2D2D2D]">
+        <div className="max-w-4xl mx-auto w-full">
+          <h1 className="text-2xl md:text-3xl font-bold">AI Coach</h1>
+          <p className="text-zinc-400 mt-1">Get personalized workout advice and program modifications</p>
+        </div>
+      </header>
+
+      <main className="flex-1 p-4">
+        <div className="max-w-4xl mx-auto w-full space-y-4">
+          {/* Equipment Profile Section */}
+          <div className="bg-[#2D2D2D] border border-[#383838] shadow-md rounded-lg overflow-hidden">
+            <button 
+              onClick={toggleEquipmentProfile}
+              className="w-full px-4 py-3 flex justify-between items-center hover:bg-[#383838] transition-colors"
+            >
               <div className="flex items-center space-x-2">
-                <h2 className="font-medium">Equipment Profile</h2>
+                <span className="font-medium">Equipment Profile</span>
                 {selectedEquipmentProfile && (
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-zinc-400">
                     {selectedEquipmentProfile.name} ({selectedEquipmentProfile.location})
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => setShowEquipmentProfile(!showEquipmentProfile)}
-                className="text-sm text-indigo-600 hover:text-indigo-800"
-              >
-                {showEquipmentProfile ? 'Hide' : 'Configure'}
-              </button>
-            </div>
+              {showEquipmentProfile ? 
+                <ChevronUp className="h-5 w-5 text-zinc-400" /> : 
+                <ChevronDown className="h-5 w-5 text-zinc-400" />
+              }
+            </button>
+            
+            {/* Equipment profile (conditionally shown) */}
+            {showEquipmentProfile && (
+              <div className="p-4 border-t border-[#383838]">
+                <EquipmentProfile onProfileSelected={handleProfileSelected} />
+              </div>
+            )}
           </div>
           
-          {/* Equipment profile (conditionally shown) */}
-          {showEquipmentProfile && (
-            <div className="p-4 border-b border-gray-200 bg-gray-50">
-              <EquipmentProfile onProfileSelected={handleProfileSelected} />
-            </div>
-          )}
-          
           {/* Chat area */}
-          <div className="h-[600px]">
+          <div className="bg-[#2D2D2D] border border-[#383838] shadow-md rounded-lg overflow-hidden h-[600px]">
             {isLoading ? (
               <div className="flex justify-center items-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+                <div className="flex flex-col items-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#FC2B4E]" />
+                  <p className="mt-4 text-zinc-400">Initializing your coach...</p>
+                </div>
               </div>
             ) : conversationId ? (
               <CoachChat 
@@ -131,10 +144,15 @@ export default function CoachPage() {
             ) : (
               <div className="flex justify-center items-center h-full">
                 <div className="text-center p-4">
-                  <p className="text-gray-500">Unable to start coaching session</p>
+                  <div className="mb-4 flex justify-center">
+                    <div className="p-3 rounded-full bg-[#2D2D2D] border border-[#383838]">
+                      <MessageSquare className="h-8 w-8 text-[#FC2B4E]" />
+                    </div>
+                  </div>
+                  <p className="text-zinc-400 mb-4">Unable to start coaching session</p>
                   <button
                     onClick={initializeConversation}
-                    className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                    className="px-4 py-2 bg-[#FC2B4E] hover:bg-[#E02646] text-white rounded-md transition-colors"
                   >
                     Retry
                   </button>
@@ -143,7 +161,7 @@ export default function CoachPage() {
             )}
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 } 

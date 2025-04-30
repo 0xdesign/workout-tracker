@@ -9,21 +9,32 @@ import { useWorkoutData } from '@/providers/WorkoutDataProvider';
 export default function Home() {
   const { workoutDaysByDate, workoutCompletionStatus, isLoading, error } = useWorkoutData();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [todayWorkout, setTodayWorkout] = useState<any | null>(null);
+  const [selectedWorkout, setSelectedWorkout] = useState<any | null>(null);
   const [todayDate, setTodayDate] = useState<string>('');
   
   // Set today's date and workout on initial load
   useEffect(() => {
     if (!isLoading && workoutDaysByDate) {
       const today = new Date().toISOString().split('T')[0];
+      console.log(`Initial load - Today: ${today}, Available dates:`, Object.keys(workoutDaysByDate).length);
       setTodayDate(today);
-      setTodayWorkout(workoutDaysByDate[today] || null);
+      setSelectedDate(today);
+      setSelectedWorkout(workoutDaysByDate[today] || null);
     }
   }, [isLoading, workoutDaysByDate]);
   
   const handleDateSelect = (date: string) => {
-    setSelectedDate(date);
     console.log(`Date selected: ${date}`);
+    console.log(`Workout available for selected date: ${!!workoutDaysByDate[date]}`);
+    if (workoutDaysByDate[date]) {
+      console.log(`Workout name: ${workoutDaysByDate[date].name}`);
+    }
+    
+    setSelectedDate(date);
+    // Update the selected workout based on the selected date
+    const workout = workoutDaysByDate[date] || null;
+    console.log('Setting selected workout:', workout);
+    setSelectedWorkout(workout);
   };
   
   // Helper function to determine workout type based on name
@@ -38,6 +49,11 @@ export default function Home() {
     }
     return 'strength'; // default
   };
+  
+  // Debug effect to track selected workout changes
+  useEffect(() => {
+    console.log('Selected workout updated:', selectedWorkout?.name || 'None');
+  }, [selectedWorkout]);
   
   if (isLoading) {
     return (
@@ -74,8 +90,39 @@ export default function Home() {
             workoutDaysByDate={workoutDaysByDate}
             workoutCompletionStatus={workoutCompletionStatus}
             onSelectDate={handleDateSelect}
+            selectedDate={selectedDate}
           />
         </section>
+        
+        {/* Selected Day Workout (if any) */}
+        {selectedDate && selectedWorkout && (
+          <section className="mb-6 animate-fadeIn">
+            <div className="bg-[#2D2D2D] rounded-lg p-4">
+              <h2 className="text-xl font-bold mb-3 text-white">{selectedWorkout.name}</h2>
+              <p className="text-gray-300 mb-3">
+                {selectedWorkout.exercises.length} exercises
+              </p>
+              <a 
+                href={`/workout/${selectedWorkout.id}?date=${selectedDate}`}
+                className="px-4 py-2 bg-[#FC2B4E] text-white rounded-lg hover:bg-[#E02646] transition-colors inline-block text-sm font-bold"
+              >
+                {workoutCompletionStatus[selectedDate] ? 'View Workout' : 'Start Workout'}
+              </a>
+            </div>
+          </section>
+        )}
+        
+        {/* Rest Day Message */}
+        {selectedDate && !selectedWorkout && (
+          <section className="mb-6 animate-fadeIn">
+            <div className="bg-[#2D2D2D] rounded-lg p-4">
+              <h2 className="text-xl font-bold mb-3 text-white">Rest Day</h2>
+              <p className="text-gray-300">
+                No workout scheduled for this day. Take time to recover and prepare for your next session.
+              </p>
+            </div>
+          </section>
+        )}
         
         {/* Recent Workouts */}
         <section className="mb-6 animate-fadeIn" style={{ animationDelay: '200ms' }}>
