@@ -14,7 +14,7 @@ const responseCache = new Map<string, CacheEntry>();
 /**
  * Configuration options for OpenAI API requests
  */
-const DEFAULT_MODEL = 'gpt-4.1';
+const DEFAULT_MODEL = 'gpt-4o';
 const DEFAULT_TEMPERATURE = 0.2;
 const DEFAULT_MAX_TOKENS = 1000;
 
@@ -116,9 +116,17 @@ function isApiConfigured(): boolean {
  * @returns The API key or an empty string if not found
  */
 function getApiKey(): string {
-  return process.env.NEXT_PUBLIC_OPENAI_API_KEY || 
-         process.env.OPENAI_API_KEY || 
-         '';
+  // First try environment variables
+  const envKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  
+  if (envKey) {
+    // Clean up any malformed key (remove line breaks and trailing special characters)
+    return envKey.replace(/\n|\r|%$/g, '');
+  }
+  
+  // For development/testing only
+  console.warn('OpenAI API key is not properly configured. Please set up in environment variables.');
+  return ''; // Do not hardcode API keys in source code
 }
 
 /**

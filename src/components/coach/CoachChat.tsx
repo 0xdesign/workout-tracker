@@ -124,23 +124,43 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
     setIsLoading(true);
     setError(null);
     
+    // Debug logging
+    console.log('Sending message:', content);
+    console.log('Current conversation:', conversation);
+    
     try {
       // Add user message to conversation
+      console.log('Adding user message to conversation...');
       const userMessage = await addMessageToConversation('user', content);
-      if (!userMessage) throw new Error('Failed to add user message');
+      if (!userMessage) {
+        console.error('Failed to add user message to conversation');
+        throw new Error('Failed to add user message');
+      }
+      console.log('User message added successfully:', userMessage);
       
       // Clear input
       setInputMessage('');
       
       // Get response from AI
+      console.log('Requesting AI response...');
+      console.log('Sending messages:', [...(conversation.messages || []), userMessage]);
+      console.log('With context:', conversation.context);
+      
       const aiResponse = await openaiService.sendCoachMessage(
         [...(conversation.messages || []), userMessage],
         conversation.context
       );
       
+      console.log('AI response received:', aiResponse);
+      
       if (aiResponse) {
         // Add AI response to conversation
+        console.log('Adding AI response to conversation...');
         await addMessageToConversation('assistant', aiResponse);
+        console.log('AI response added to conversation');
+      } else {
+        console.error('AI response was null or empty');
+        setError('No response received from AI. Please try again.');
       }
     } catch (err) {
       console.error('Error sending message:', err);
