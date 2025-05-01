@@ -388,7 +388,7 @@ export async function sendCoachMessage(
   // Check if API is configured
   if (!isApiConfigured()) {
     console.error('OpenAI API key is not configured');
-    return null;
+    return 'Error: OpenAI API key is not configured. Please check your environment variables.';
   }
   
   // Format messages for the API
@@ -404,36 +404,58 @@ export async function sendCoachMessage(
   });
   
   try {
+    console.log('Sending request to OpenAI API with model:', DEFAULT_MODEL);
+    console.log('API Key configured:', !!getApiKey());
+    
+    const requestBody = JSON.stringify({
+      model: DEFAULT_MODEL,
+      temperature: 0.5, // Slightly higher temperature for more natural conversation
+      max_tokens: 2000, // More tokens for detailed responses
+      messages: apiMessages
+    });
+    
+    console.log('Request payload size:', requestBody.length, 'bytes');
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${getApiKey()}`
       },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        temperature: 0.5, // Slightly higher temperature for more natural conversation
-        max_tokens: 2000, // More tokens for detailed responses
-        messages: apiMessages
-      })
+      body: requestBody
     });
+    
+    console.log('OpenAI API response status:', response.status);
     
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      console.error('OpenAI API error details:', JSON.stringify(errorData));
+      
+      // Return a user-friendly error message based on status
+      if (response.status === 401) {
+        return 'Error: API key is invalid. Please contact support.';
+      } else if (response.status === 429) {
+        return 'Error: Rate limit exceeded. Please try again later.';
+      } else if (response.status === 400) {
+        return `Error: Bad request - ${errorData.error?.message || 'Unknown error'}`;
+      } else {
+        return `Error: OpenAI API error (${response.status}). Please try again later.`;
+      }
     }
     
     const data = await response.json();
+    console.log('Response received:', !!data);
+    
     const content = data.choices[0]?.message?.content;
     
     if (!content) {
-      throw new Error('Empty response from OpenAI API');
+      console.error('Empty response content from OpenAI API');
+      return 'Error: Received an empty response from the AI. Please try again.';
     }
     
     return content;
   } catch (error) {
-    console.error('Error sending message to AI coach:', error);
+    console.error('Error details:', error);
     return 'I apologize, but I\'m unable to provide coaching advice right now. Please try again later.';
   }
 }
