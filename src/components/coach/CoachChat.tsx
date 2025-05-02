@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Message, Conversation, ChatContext, QuickPrompt } from '@/types/coach';
-import { WorkoutCoachResponse, WorkoutPerformance } from '@/types/workout';
+import { WorkoutCoachResponse, WorkoutPerformance, WorkoutDay, WorkoutPlan } from '@/types/workout';
 import { quickPrompts } from '@/lib/coach-service';
 import * as coachService from '@/lib/coach-service';
 import * as openaiService from '@/lib/openai-service';
@@ -12,6 +12,75 @@ import WorkoutModifications from './WorkoutModifications';
 import { WorkoutChangeProposal } from './WorkoutChangeProposal';
 import { ProgramChangeNotification } from './ProgramChangeNotification';
 
+// Calculate Levenshtein distance for fuzzy matching
+const levenshteinDistance = (a: string, b: string): number => {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
+
+  for (let i = 0; i <= a.length; i++) {
+    matrix[i][0] = i;
+  }
+
+  for (let j = 0; j <= b.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,       // deletion
+        matrix[i][j - 1] + 1,       // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+
+  return matrix[a.length][b.length];
+};
+
+// Find best matching workout based on ID or name
+const findBestWorkoutMatch = (
+  inputId: string, 
+  workoutDays: WorkoutDay[]
+): WorkoutDay | null => {
+  if (!workoutDays || workoutDays.length === 0) return null;
+  
+  // Normalize input
+  const normalizedInput = inputId.toLowerCase().trim();
+  
+  // Try exact match first
+  const exactMatch = workoutDays.find(day => 
+    day.id.toLowerCase() === normalizedInput || 
+    day.name.toLowerCase() === normalizedInput
+  );
+  
+  if (exactMatch) return exactMatch;
+  
+  // If no exact match, try fuzzy matching
+  let bestMatch: WorkoutDay | null = null;
+  let bestScore = Infinity;
+  
+  for (const day of workoutDays) {
+    const nameDistance = levenshteinDistance(normalizedInput, day.name.toLowerCase());
+    const idDistance = levenshteinDistance(normalizedInput, day.id.toLowerCase());
+    const minDistance = Math.min(nameDistance, idDistance);
+    
+    // Normalize score by length to handle shorter strings better
+    const normalizedScore = minDistance / Math.max(normalizedInput.length, day.name.length);
+    
+    if (normalizedScore < bestScore) {
+      bestScore = normalizedScore;
+      bestMatch = day;
+    }
+  }
+  
+  // Only return if score is below threshold (0.4 means 60% similarity)
+  return bestScore < 0.4 ? bestMatch : null;
+};
+
 interface CoachChatProps {
   initialContext?: ChatContext;
   conversationId?: string;
@@ -22,6 +91,9 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chatMode, setChatMode] = useState<'advice' | 'modification'>('advice');
+  const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
+  const [showWorkoutSelector, setShowWorkoutSelector] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -35,7 +107,92 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
     changeType: 'add' | 'remove' | 'modify' | 'program';
   } | null>(null);
   
-  const { refreshData } = useWorkoutData();
+  const { refreshData, workoutPlan: dataProviderWorkoutPlan } = useWorkoutData();
+
+  // Load workout plan from provider
+  useEffect(() => {
+    if (dataProviderWorkoutPlan) {
+      setWorkoutPlan(dataProviderWorkoutPlan);
+    }
+  }, [dataProviderWorkoutPlan]);
+  
+  // Load chat mode from localStorage
+  useEffect(() => {
+    const savedMode = localStorage.getItem('chatMode');
+    if (savedMode === 'advice' || savedMode === 'modification') {
+      setChatMode(savedMode as 'advice' | 'modification');
+    }
+  }, []);
+  
+  // Save chat mode to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('chatMode', chatMode);
+  }, [chatMode]);
+
+  // Function to toggle between advice and modification modes
+  const toggleChatMode = () => {
+    const newMode = chatMode === 'advice' ? 'modification' : 'advice';
+    setChatMode(newMode);
+    
+    // Inform the user about the mode change
+    const modeChangeMessage = newMode === 'advice' 
+      ? "I'm now in advice mode. I'll provide workout guidance without making any changes to your program."
+      : "I'm now in modification mode. I can help you make changes to your workout program. Type 'list workouts' to see available workouts.";
+      
+    addMessageToConversation('assistant', modeChangeMessage);
+  };
+
+  // Get available workout list
+  const listAvailableWorkouts = async (): Promise<string> => {
+    const plan = await workoutService.getActiveWorkoutPlan();
+    if (!plan) return "No workout plan is currently active.";
+    
+    let message = "**Available workouts:**\n\n";
+    plan.days.forEach(day => {
+      message += `- **${day.name}** (ID: ${day.id})\n`;
+    });
+    
+    message += "\nYou can modify a workout by saying: 'modify [workout name]' or by clicking on one from the list I'll show you.";
+    return message;
+  };
+
+  // Handle the "list workouts" command
+  const handleListWorkouts = async () => {
+    setIsLoading(true);
+    
+    try {
+      // Add user message to conversation
+      await addMessageToConversation('user', 'list workouts');
+      
+      // Generate workout list
+      const workoutList = await listAvailableWorkouts();
+      
+      // Add assistant response
+      await addMessageToConversation('assistant', workoutList);
+      
+      // Also show clickable workout list interface
+      setShowWorkoutSelector(true);
+    } catch (err) {
+      console.error('Error listing workouts:', err);
+      setError('Failed to list workouts. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle workout selection from the list
+  const handleWorkoutSelect = async (workout: WorkoutDay) => {
+    setShowWorkoutSelector(false);
+    
+    // Prompt for feedback
+    await addMessageToConversation(
+      'assistant', 
+      `What would you like to modify about the **${workout.name}** workout? Please provide details about what you want to change.`
+    );
+    
+    // Store the selection so the next message is processed as feedback
+    localStorage.setItem('pendingWorkoutModification', workout.id);
+  };
   
   // Scroll to the bottom of the messages
   const scrollToBottom = () => {
@@ -193,6 +350,64 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
     sendMessage(prompt.text);
   };
   
+  // Parse message content for workout modification requests
+  const parseMessageForModificationRequest = (content: string) => {
+    // List workouts command
+    if (content.toLowerCase().match(/list\s+workouts?/i)) {
+      handleListWorkouts();
+      return true;
+    }
+    
+    // Check for a pending workout modification from selection
+    const pendingWorkoutId = localStorage.getItem('pendingWorkoutModification');
+    if (pendingWorkoutId) {
+      localStorage.removeItem('pendingWorkoutModification');
+      requestWorkoutModifications(pendingWorkoutId, content);
+      return true;
+    }
+    
+    // Enhanced pattern matching for workout modification requests
+    // 1. Updated regex pattern to handle spaces in workout IDs
+    const workoutIdMatch = content.match(/workout\s+(?:id|ID)?\s*[:#]?\s*([a-zA-Z0-9_\s-]+)/i);
+    
+    // 2. Additional patterns to catch more natural language requests
+    const alternativePatterns = [
+      /(?:modify|change|adjust|update)\s+(?:my|the)?\s*([a-zA-Z0-9_\s-]+)\s+workout/i,
+      /(?:modify|change|adjust|update)\s+(?:my|the)?\s*workout\s+(?:called|named)?\s*([a-zA-Z0-9_\s-]+)/i,
+      /(?:make|do)\s+changes\s+to\s+(?:my|the)?\s*([a-zA-Z0-9_\s-]+)\s+workout/i
+    ];
+    
+    // Check for modification intent indicators
+    const hasFeedbackIndicators = 
+      content.toLowerCase().includes('modify') || 
+      content.toLowerCase().includes('adjust') || 
+      content.toLowerCase().includes('change') || 
+      content.toLowerCase().includes('update') ||
+      content.toLowerCase().includes('different');
+    
+    // Extract workout ID from main pattern or alternatives
+    let workoutId = null;
+    if (workoutIdMatch && hasFeedbackIndicators) {
+      workoutId = workoutIdMatch[1].trim();
+    } else {
+      // Try alternative patterns
+      for (const pattern of alternativePatterns) {
+        const match = content.match(pattern);
+        if (match) {
+          workoutId = match[1].trim();
+          break;
+        }
+      }
+    }
+    
+    if (workoutId) {
+      requestWorkoutModifications(workoutId, content);
+      return true;
+    }
+    
+    return false;
+  };
+  
   // Request workout modifications
   const requestWorkoutModifications = async (workoutId: string, feedback: string) => {
     if (!conversation) return;
@@ -201,12 +416,50 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
     setError(null);
     
     try {
+      // Get the active workout plan
+      const plan = await workoutService.getActiveWorkoutPlan();
+      
       // Get the workout performance details
       const workouts = await workoutService.getWorkoutPerformancesForDay(workoutId);
       const workout = workouts[0]; // For simplicity, use the first one
       
       if (!workout) {
-        throw new Error('Workout not found');
+        // Try fuzzy matching to find the workout
+        const bestMatch = plan ? findBestWorkoutMatch(workoutId, plan.days) : null;
+        
+        let errorMessage = `I couldn't find a workout with ID "${workoutId}".`;
+        
+        if (bestMatch) {
+          // We found a likely match
+          errorMessage = `I couldn't find a workout with ID "${workoutId}". Did you mean "${bestMatch.name}"? I'll try to use that instead.`;
+          
+          // Try again with the matched workout ID
+          await addMessageToConversation('assistant', errorMessage);
+          setIsLoading(false);
+          
+          // Continue with the matched workout ID
+          requestWorkoutModifications(bestMatch.id, feedback);
+          return;
+        } else {
+          // No match found, show available workouts
+          const availableWorkouts = plan?.days.map(day => day.name) || [];
+          
+          if (availableWorkouts.length > 0) {
+            errorMessage += ` Available workouts are: ${availableWorkouts.join(', ')}. You can also type "list workouts" to see all available options.`;
+          } else {
+            errorMessage += " I couldn't find any workouts in your plan.";
+          }
+          
+          await addMessageToConversation('assistant', errorMessage);
+          // Suggest listing workouts
+          setShowWorkoutSelector(true);
+          await addMessageToConversation(
+            'assistant',
+            "Here are the workouts in your plan. Click on one to modify it:"
+          );
+          setIsLoading(false);
+          return;
+        }
       }
       
       setSelectedWorkout(workout);
@@ -329,49 +582,103 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
     setProgramChanges(null);
   };
   
-  // Parse message content for workout modification requests
-  const parseMessageForModificationRequest = (content: string) => {
-    // Simple pattern matching for workout modification requests
-    const workoutIdMatch = content.match(/workout\s+(?:id|ID)?\s*[:#]?\s*([a-zA-Z0-9_-]+)/i);
-    const hasFeedbackIndicators = 
-      content.includes('modify') || 
-      content.includes('adjust') || 
-      content.includes('change') || 
-      content.includes('update') ||
-      content.includes('different');
-    
-    if (workoutIdMatch && hasFeedbackIndicators) {
-      const workoutId = workoutIdMatch[1];
-      requestWorkoutModifications(workoutId, content);
-      return true;
-    }
-    
-    return false;
-  };
-  
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if the message appears to be a workout modification request
-    if (parseMessageForModificationRequest(inputMessage)) {
-      // If it is, we'll handle it differently and not send a regular message
-      setInputMessage('');
-      return;
+    // Skip empty messages
+    if (!inputMessage.trim()) return;
+    
+    // Only process modification requests in modification mode
+    if (chatMode === 'modification') {
+      // Special command for listing workouts
+      if (inputMessage.toLowerCase().match(/list\s+workouts?/i)) {
+        handleListWorkouts();
+        setInputMessage('');
+        return;
+      }
+      
+      // Check if the message appears to be a workout modification request
+      if (parseMessageForModificationRequest(inputMessage)) {
+        // If it is, we'll handle it differently and not send a regular message
+        setInputMessage('');
+        return;
+      }
     }
     
     sendMessage(inputMessage);
   };
   
+  // Render the workout selector UI
+  const renderWorkoutSelector = () => {
+    if (!workoutPlan || !showWorkoutSelector) return null;
+    
+    return (
+      <div className="mb-4 mt-2">
+        <div className="space-y-2">
+          {workoutPlan.days.map(day => (
+            <button
+              key={day.id}
+              onClick={() => handleWorkoutSelect(day)}
+              className="w-full p-3 bg-[#383838] hover:bg-[#4D4D4D] rounded-md text-left flex justify-between items-center transition-colors"
+            >
+              <div>
+                <div className="font-medium text-white">{day.name}</div>
+                <div className="text-xs text-gray-400">{day.exercises.length} exercises</div>
+              </div>
+              <span className="text-[#FC2B4E]">Select</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  
+  // Mode toggle UI component
+  const ModeToggle = () => (
+    <div className="w-full flex items-center justify-between p-3 mb-3 bg-[#2D2D2D] border border-[#383838] rounded-lg">
+      <div className="flex flex-col">
+        <span className="text-sm font-medium text-white">Mode: {chatMode === 'advice' ? 'Advice' : 'Modification'}</span>
+        <span className="text-xs text-gray-400">
+          {chatMode === 'advice' 
+            ? 'Get workout advice without making changes' 
+            : 'Make changes to your workout program'}
+        </span>
+      </div>
+      <button
+        onClick={toggleChatMode}
+        className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+          chatMode === 'advice'
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-[#FC2B4E] text-white hover:bg-[#E02646]'
+        }`}
+      >
+        Switch to {chatMode === 'advice' ? 'Modification' : 'Advice'} Mode
+      </button>
+    </div>
+  );
+  
   return (
-    <div className="flex flex-col h-full max-h-[600px] bg-[#1F1F1F] border border-[#383838] rounded-lg shadow-sm">
+    <div className={`flex flex-col h-full max-h-[600px] bg-[#1F1F1F] border ${
+      chatMode === 'advice' 
+        ? 'border-[#383838]' 
+        : 'border-[#FC2B4E]'
+    } rounded-lg shadow-sm`}>
+      {/* Mode Toggle */}
+      <div className="px-4 pt-4">
+        <ModeToggle />
+      </div>
+      
       {/* Chat messages */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto px-4">
         {conversation?.messages && conversation.messages.length > 0 ? (
           <div className="space-y-4">
             {conversation.messages.map(message => (
               <MessageBubble key={message.id} message={message} />
             ))}
+            
+            {/* Workout selector (appears after list workouts command) */}
+            {renderWorkoutSelector()}
             
             {/* Workout modification proposal */}
             {workoutModifications && (
@@ -394,7 +701,11 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
           <div className="flex justify-center items-center h-full">
             <div className="text-center text-gray-400">
               <p className="mb-2">How can I help with your workout today?</p>
-              <p className="text-sm">Ask about exercise modifications, form tips, or program adjustments.</p>
+              <p className="text-sm">
+                {chatMode === 'advice' 
+                  ? 'Ask about exercise techniques, form tips, or program suggestions.' 
+                  : 'Ask me to modify your workouts or type "list workouts" to see available options.'}
+              </p>
             </div>
           </div>
         )}
@@ -421,7 +732,9 @@ export default function CoachChat({ initialContext = {}, conversationId }: Coach
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             disabled={isLoading}
-            placeholder="Type your message..."
+            placeholder={chatMode === 'advice' 
+              ? "Ask for workout advice..." 
+              : 'Type "list workouts" or make a modification request...'}
             className="flex-1 rounded-l-md border border-[#383838] bg-[#2D2D2D] p-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#FC2B4E] focus:border-transparent"
           />
           <button
