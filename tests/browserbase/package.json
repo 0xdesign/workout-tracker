@@ -1,0 +1,17 @@
+{
+  "name": "workout-tracker-browserbase-tests",
+  "version": "1.0.0",
+  "description": "Browserbase tests for the Workout Tracker application",
+  "main": "index.js",
+  "scripts": {
+    "test:id-recognition": "browserbase run workout-id-recognition.js",
+    "test:mode-toggle": "browserbase run mode-toggle-tests.js",
+    "test:visualization": "browserbase run visualization-tests.js",
+    "test:all": "browserbase run workout-id-recognition.js mode-toggle-tests.js visualization-tests.js"
+  },
+  "dependencies": {
+    "browserbase": "^1.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+} 
