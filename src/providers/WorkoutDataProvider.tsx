@@ -15,6 +15,7 @@ interface WorkoutDataContextType {
   getWorkoutDayForDate: (date: Date) => Promise<WorkoutDay | undefined>;
   getWorkoutPerformance: (workoutDayId: string, date: string) => Promise<WorkoutPerformance | undefined>;
   refreshData: () => Promise<void>;
+  getAllWorkoutDays: () => WorkoutDay[] | null;
 }
 
 const WorkoutDataContext = createContext<WorkoutDataContextType | undefined>(undefined);
@@ -217,7 +218,8 @@ export function WorkoutDataProvider({ children }: WorkoutDataProviderProps) {
     recentWorkouts,
     getWorkoutDayForDate,
     getWorkoutPerformance,
-    refreshData
+    refreshData,
+    getAllWorkoutDays: () => Object.values(workoutDaysByDate)
   };
   
   return (

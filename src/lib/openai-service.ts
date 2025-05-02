@@ -221,12 +221,6 @@ export async function getPerformanceSuggestions(
     return null;
   }
   
-  // Check if API is configured
-  if (!isApiConfigured()) {
-    console.error('OpenAI API key is not configured');
-    return null;
-  }
-  
   // Create cache key and check cache
   const cacheKey = createCacheKey(exerciseId, performanceHistory);
   const cachedResponse = responseCache.get(cacheKey);
@@ -241,11 +235,11 @@ export async function getPerformanceSuggestions(
     const systemPrompt = createSystemPrompt();
     const userPrompt = createPromptContent(exerciseId, performanceHistory);
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call our server-side API route instead of OpenAI directly
+    const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getApiKey()}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -260,15 +254,15 @@ export async function getPerformanceSuggestions(
     
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      console.error('API error:', errorData);
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
     const contentStr = data.choices[0]?.message?.content;
     
     if (!contentStr) {
-      throw new Error('Empty response from OpenAI API');
+      throw new Error('Empty response from API');
     }
     
     // Parse the JSON response
@@ -283,8 +277,8 @@ export async function getPerformanceSuggestions(
       
       return suggestions;
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response as JSON:', parseError);
-      throw new Error('Invalid response format from OpenAI API');
+      console.error('Failed to parse API response as JSON:', parseError);
+      throw new Error('Invalid response format from API');
     }
   } catch (error) {
     console.error('Error fetching AI suggestions:', error);
@@ -385,12 +379,6 @@ export async function sendCoachMessage(
   messages: Message[],
   context?: ChatContext
 ): Promise<string | null> {
-  // Check if API is configured
-  if (!isApiConfigured()) {
-    console.error('OpenAI API key is not configured');
-    return 'Error: OpenAI API key is not configured. Please check your environment variables.';
-  }
-  
   // Format messages for the API
   const apiMessages = messages.map(message => ({
     role: message.role,
@@ -404,8 +392,7 @@ export async function sendCoachMessage(
   });
   
   try {
-    console.log('Sending request to OpenAI API with model:', DEFAULT_MODEL);
-    console.log('API Key configured:', !!getApiKey());
+    console.log('Sending request to our server API route with model:', DEFAULT_MODEL);
     
     const requestBody = JSON.stringify({
       model: DEFAULT_MODEL,
@@ -416,20 +403,20 @@ export async function sendCoachMessage(
     
     console.log('Request payload size:', requestBody.length, 'bytes');
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call our server-side API route instead of OpenAI directly
+    const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getApiKey()}`
+        'Content-Type': 'application/json'
       },
       body: requestBody
     });
     
-    console.log('OpenAI API response status:', response.status);
+    console.log('API response status:', response.status);
     
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error details:', JSON.stringify(errorData));
+      console.error('API error details:', JSON.stringify(errorData));
       
       // Return a user-friendly error message based on status
       if (response.status === 401) {
@@ -438,8 +425,10 @@ export async function sendCoachMessage(
         return 'Error: Rate limit exceeded. Please try again later.';
       } else if (response.status === 400) {
         return `Error: Bad request - ${errorData.error?.message || 'Unknown error'}`;
+      } else if (response.status === 500) {
+        return `Error: Server error - ${errorData.error || 'OpenAI API key may not be configured on the server'}`;
       } else {
-        return `Error: OpenAI API error (${response.status}). Please try again later.`;
+        return `Error: API error (${response.status}). Please try again later.`;
       }
     }
     
@@ -449,7 +438,7 @@ export async function sendCoachMessage(
     const content = data.choices[0]?.message?.content;
     
     if (!content) {
-      console.error('Empty response content from OpenAI API');
+      console.error('Empty response content from API');
       return 'Error: Received an empty response from the AI. Please try again.';
     }
     
@@ -471,12 +460,6 @@ export async function createWorkoutModifications(
   feedback: string,
   equipmentProfile?: EquipmentProfile
 ): Promise<WorkoutCoachResponse | null> {
-  // Check if API is configured
-  if (!isApiConfigured()) {
-    console.error('OpenAI API key is not configured');
-    return null;
-  }
-  
   const systemPrompt = `You are an expert strength coach and personal trainer with deep knowledge of weight training, 
   progressive overload, and exercise form. Your task is to analyze a workout performance and user feedback 
   to suggest appropriate modifications to the program.
@@ -556,11 +539,11 @@ export async function createWorkoutModifications(
   }`;
   
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call our server-side API route instead of OpenAI directly
+    const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getApiKey()}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -575,15 +558,15 @@ export async function createWorkoutModifications(
     
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      console.error('API error:', errorData);
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
     const contentStr = data.choices[0]?.message?.content;
     
     if (!contentStr) {
-      throw new Error('Empty response from OpenAI API');
+      throw new Error('Empty response from API');
     }
     
     // Parse the JSON response
@@ -591,8 +574,8 @@ export async function createWorkoutModifications(
       const modifications: WorkoutCoachResponse = JSON.parse(contentStr);
       return modifications;
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response as JSON:', parseError);
-      throw new Error('Invalid response format from OpenAI API');
+      console.error('Failed to parse API response as JSON:', parseError);
+      throw new Error('Invalid response format from API');
     }
   } catch (error) {
     console.error('Error generating workout modifications:', error);
@@ -604,12 +587,6 @@ export async function getCoachResponse(
   conversationHistory: { role: string; content: string }[],
   userContext: any
 ): Promise<any> {
-  // Check if API is configured
-  if (!isApiConfigured()) {
-    console.error('OpenAI API key is not configured');
-    throw new Error('OpenAI API key is not configured');
-  }
-  
   try {
     // Format messages for the API
     const apiMessages = conversationHistory.map(message => ({
@@ -637,11 +614,11 @@ export async function getCoachResponse(
       content: createCoachSystemPrompt(context)
     });
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call our server-side API route instead of OpenAI directly
+    const response = await fetch('/api/openai', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getApiKey()}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -653,15 +630,15 @@ export async function getCoachResponse(
     
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      console.error('API error:', errorData);
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
     const contentStr = data.choices[0]?.message?.content;
     
     if (!contentStr) {
-      throw new Error('Empty response from OpenAI API');
+      throw new Error('Empty response from API');
     }
     
     // Parse the JSON response
@@ -669,8 +646,8 @@ export async function getCoachResponse(
       const coachResponse = JSON.parse(contentStr);
       return coachResponse;
     } catch (parseError) {
-      console.error('Failed to parse OpenAI response as JSON:', parseError);
-      throw new Error('Invalid response format from OpenAI API');
+      console.error('Failed to parse API response as JSON:', parseError);
+      throw new Error('Invalid response format from API');
     }
   } catch (error) {
     console.error('Error getting coach response:', error);
